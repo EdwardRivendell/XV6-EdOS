@@ -26,7 +26,7 @@ void start() {
 
   // set M Exception Program Counter to main, for mret.
   // requires gcc -mcmodel=medany
-  w_mepc((uint64)main);
+  w_mepc((uint64)main);//向机器态的epc寄存器写入main函数的地址
 
   // disable paging for now.
   w_satp(0);
@@ -55,7 +55,7 @@ void start() {
   }
 
   // switch to supervisor mode and jump to main().
-  asm volatile("mret");
+  asm volatile("mret");//将特权集从机器态切换到内核态（监管态）
 }
 
 // set up to receive timer interrupts in machine mode,

@@ -25,7 +25,7 @@ void trapinithart(void) { w_stvec((uint64)kernelvec); }
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
 //
-void usertrap(void) {
+void usertrap(void) {//处理来自用户态的中断、异常或系统调用。
   int which_dev = 0;
 
   if ((r_sstatus() & SSTATUS_SPP) != 0) panic("usertrap: not from user mode");
