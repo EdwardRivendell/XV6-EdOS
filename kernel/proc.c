@@ -16,6 +16,7 @@ int nextpid = 1;
 struct spinlock pid_lock;
 
 extern void forkret(void);
+const char* state_to_str(enum procstate state);
 static void wakeup1(struct proc *chan);
 static void freeproc(struct proc *p);
 
@@ -296,6 +297,8 @@ void reparent(struct proc *p) {
 // until its parent calls wait().
 void exit(int status) {
   struct proc *p = myproc();
+  struct proc *child_proc;
+  int child_num = -1;
 
   if (p == initproc) panic("init exiting");
 
@@ -313,6 +316,23 @@ void exit(int status) {
   end_op();
   p->cwd = 0;
 
+  //print exit information
+  acquire(&p->lock);
+  acquire(&p->parent->lock);//父亲的锁也要获得
+  exit_info("proc %d exit, parent pid %d, name %s, state %s\n", p->pid, p->parent->pid, p->parent->name, state_to_str(p->parent->state));
+  release(&p->lock);
+  release(&p->parent->lock);
+
+  for(child_proc = proc; child_proc < &proc[NPROC]; child_proc++) {
+    acquire(&child_proc->lock);
+    if(child_proc->parent == p) {
+      child_num++;
+      acquire(&p->lock);
+      exit_info("proc %d exit, child %d, pid %d, name %s, state %s\n", p->pid, child_num, child_proc->pid, child_proc->name, state_to_str(child_proc->state));
+      release(&p->lock);
+    }
+    release(&child_proc->lock);
+  }
   // we might re-parent a child to init. we can't be precise about
   // waking up init, since we can't acquire its lock once we've
   // acquired any other proc lock. so wake up init whether that's
@@ -356,7 +376,8 @@ void exit(int status) {
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
-int wait(uint64 addr) {
+int wait(uint64 addr,int flags) {
+  if (flags == 1) return -1;
   struct proc *np;
   int havekids, pid;
   struct proc *p = myproc();
@@ -401,7 +422,11 @@ int wait(uint64 addr) {
     }
 
     // Wait for a child to exit.
-    sleep(p, &p->lock);  // DOC: wait-sleep
+    if (flags == 1){
+      return -1;
+    }
+    else {
+      sleep(p, &p->lock); } // DOC: wait-sleep
   }
 }
 
@@ -618,4 +643,15 @@ void procdump(void) {
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+const char* state_to_str(enum procstate state) {
+    switch (state) {
+        case UNUSED:    return "unused";
+        case SLEEPING:  return "sleeping";
+        case RUNNABLE:  return "runnable";
+        case RUNNING:   return "running";
+        case ZOMBIE:    return "zombie";
+        default:        return "unknown";
+    }
 }

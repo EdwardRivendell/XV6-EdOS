@@ -22,6 +22,7 @@ int dup(int);
 int getpid(void);
 char* sbrk(int);
 int sleep(int);
+int yield(void);// 让渡CPU
 int uptime(void);
 int rename(const char*);
 

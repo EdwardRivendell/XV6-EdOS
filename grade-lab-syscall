@@ -32,6 +32,7 @@ def test_yield_test():
     r.match("parent yield")
 
     match = re.search(r'Save the context of the process to the memory region from address (0x[0-9a-fA-F]+) to (0x[0-9a-fA-F]+)', r.qemu.output, re.MULTILINE)
+    print("Success")
     assert match is not None, "can't find this sentence: Save the context of the process to the memory region from address (0x[0-9a-fA-F]+) to (0x[0-9a-fA-F]+)"
     addr1 = int(match.group(1), 16)
     addr2 = int(match.group(2), 16)
