@@ -1757,6 +1757,7 @@ manywrites(char *s)
             printf("%s: cannot create %s\n", s, name);
             exit(1);
           }
+          printf("suceed in opening");
           int sz = sizeof(buf);
           int cc = write(fd, buf, sz);
           if(cc != sz){

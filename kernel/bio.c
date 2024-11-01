@@ -144,9 +144,14 @@ bget(uint dev, uint blockno)//panic sched-lock 不是bget的问题
         return b;
       }
     }
-
+    release(&bcache.lock[bucket]);
+    release(&bcache.lock[i]);
     release(&bcache.global_lock);
+
+    acquire(&bcache.lock[bucket]);//重新获取否则下一轮会panic release
   }
+
+  release(&bcache.lock[bucket]);
   
   panic("bget: no buffers");
 }
@@ -220,5 +225,3 @@ bunpin(struct buf *b) {
 
   release(&bcache.lock[bucket]);
 }
-
-
