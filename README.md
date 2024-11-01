@@ -1,3 +1,3 @@
-# XV6-OSLAB24-HITSZ
+# XV6-OSLAB24-Ed
 
-2024年 HITSZ的xv6 OS实验
+this is a XV6 OS from MIT and edited by Edward Rivendell
