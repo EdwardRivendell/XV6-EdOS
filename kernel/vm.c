@@ -60,24 +60,26 @@ void kvminithart() {
 // pages. A page-table page contains 512 64-bit PTEs.
 // A 64-bit virtual address is split into five fields:
 //   39..63 -- must be zero.
-//   30..38 -- 9 bits of level-2 index.
-//   21..29 -- 9 bits of level-1 index.
-//   12..20 -- 9 bits of level-0 index.
-//    0..11 -- 12 bits of byte offset within the page.
-pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) {
-  if (va >= MAXVA) panic("walk");
+//   30..38 -- 9 bits of level-2 index.三级页表
+//   21..29 -- 9 bits of level-1 index.二级页表
+//   12..20 -- 9 bits of level-0 index.一级页表
+//    0..11 -- 12 bits of byte offset within the page.页内偏移地址
+pte_t *walk(pagetable_t pagetable, uint64 va, int alloc) {//mapping va to pa
+  if (va >= MAXVA) panic("walk");//va should be less than MAXVA
 
   for (int level = 2; level > 0; level--) {
+    //pagetable[va] stores pa
     pte_t *pte = &pagetable[PX(level, va)];
-    if (*pte & PTE_V) {
-      pagetable = (pagetable_t)PTE2PA(*pte);
+
+    if (*pte & PTE_V) {//PYE_V means the page is valid
+      pagetable = (pagetable_t)PTE2PA(*pte);//逐级查找
     } else {
       if (!alloc || (pagetable = (pde_t *)kalloc()) == 0) return 0;
       memset(pagetable, 0, PGSIZE);
       *pte = PA2PTE(pagetable) | PTE_V;
     }
   }
-  return &pagetable[PX(0, va)];
+  return &pagetable[PX(0, va)];//返回pagetable数组里的一个元素
 }
 
 // Look up a virtual address, return the physical address,
@@ -241,6 +243,43 @@ void freewalk(pagetable_t pagetable) {
     }
   }
   kfree((void *)pagetable);
+}
+
+void print_flags(uint64 flags) {
+  char perms[4]; // 5 个权限字符 + 1 个空终止符
+  perms[0] = (flags & PTE_R) ? 'r' : '-';
+  perms[1] = (flags & PTE_W) ? 'w' : '-';
+  perms[2] = (flags & PTE_X) ? 'x' : '-';
+  perms[3] = (flags & PTE_U) ? 'u' : '-';
+
+  printf("%s", perms);
+}
+
+void vmprint_recursive(pagetable_t pagetable, int level) {
+    for (int i = 0; i < 512; i++) {
+      pte_t pte = pagetable[i];//pte_t *pte = &pagetable[PX(level, va)];
+      if (pte & PTE_V) {
+        for (int l = 2; l > level; l--) {
+          printf("||   ");
+        }
+        uint64 pa = PTE2PA(pte);
+        if (level == 0) {
+          printf("||idx: %d: va: %p -> pa: %p, flags: ", i, (uint64)i << 12, pa);
+        } else {
+          printf("||idx: %d: pa: %p, flags: ", i, pa);
+        }
+        print_flags(pte);
+        printf("\n");
+        if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+          vmprint_recursive((pagetable_t)pa, level - 1);
+        }
+      }
+    }
+}
+
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", (uint64)pagetable);
+  vmprint_recursive(pagetable, 2);
 }
 
 // Free user memory pages,
