@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+extern pagetable_t kvmcreate();
+extern void freewalk(pagetable_t pagetable);
 struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
@@ -35,6 +37,9 @@ void procinit(void) {
     char *pa = kalloc();
     if (pa == 0) panic("kalloc");
     uint64 va = KSTACK((int)(p - proc));
+
+    p->kstack_pa = (uint64)pa;//step3 move pa to PCB new member kstack_pa
+
     kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
     p->kstack = va;
   }
@@ -105,6 +110,11 @@ found:
 
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
+
+  p->k_pagetable = kvmcreate();//step4 create kernel page table for each process,break here
+  if (mappages(p->k_pagetable, p->kstack, PGSIZE, p->kstack_pa, PTE_R | PTE_W) != 0) panic("new_kvmmap");
+
+
   if (p->pagetable == 0) {
     freeproc(p);
     release(&p->lock);
@@ -119,7 +129,21 @@ found:
 
   return p;
 }
-
+void freepage(pagetable_t pagetable) {
+  // there are 2^9 = 512 PTEs in a page table.
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V) && (pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+      // this PTE points to a lower-level page table.
+      uint64 child = PTE2PA(pte);
+      freepage((pagetable_t)child);
+      pagetable[i] = 0;
+    } else if (pte & PTE_V) {
+      pte=0;
+    }
+  }
+  kfree((void *)pagetable);
+}
 // free a proc structure and the data hanging from it,
 // including user pages.
 // p->lock must be held.
@@ -136,6 +160,8 @@ static void freeproc(struct proc *p) {
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+
+  freepage(p->k_pagetable);//step6
 }
 
 // Create a user page table for a given process,
@@ -430,7 +456,13 @@ void scheduler(void) {
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+        w_satp(MAKE_SATP(p->k_pagetable));//step5
+        sfence_vma();
+
         swtch(&c->context, &p->context);
+
+        kvminithart();//step5
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
