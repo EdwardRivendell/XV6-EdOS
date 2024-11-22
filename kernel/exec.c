@@ -98,6 +98,9 @@ int exec(char *path, char **argv) {
   p->trapframe->sp = sp;          // initial stack pointer
   proc_freepagetable(oldpagetable, oldsz);
 
+  //任务三：调用映射函数step3.4
+  user_kernel_map(p->pagetable,p->k_pagetable,0,p->sz);
+
   //if(p->pid==1)//如果希望仅在启动时打印出进程的页表，取消注释这行代码
   vmprint(p->pagetable);
   //}

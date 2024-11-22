@@ -219,6 +219,11 @@ void userinit(void) {
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
 
+  // 任务三：第一个进程也需要将用户页表映射到内核页表中
+  pte_t *pte = walk(p->pagetable, 0, 0);           // 返回进程中对应虚拟地址的页表项
+  pte_t *kernel_pte = walk(p->k_pagetable, 0, 1);  // 生成内核页表在对应虚拟地址的页表项
+  *kernel_pte = (*pte)&(~PTE_U);                    // 标志位修改
+
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
   p->trapframe->sp = PGSIZE;  // user stack pointer
@@ -242,6 +247,9 @@ int growproc(int n) {
     if ((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
       return -1;
     }
+
+    //任务三：调用映射函数
+    user_kernel_map(p->pagetable,p->k_pagetable,sz - n,sz);
   } else if (n < 0) {
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
@@ -281,6 +289,9 @@ int fork(void) {
   for (i = 0; i < NOFILE; i++)
     if (p->ofile[i]) np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  //任务三：将子进程的用户页表复制到内核页表中，调用映射函数step 3.4
+  user_kernel_map(np->pagetable,np->k_pagetable,0,np->sz);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
